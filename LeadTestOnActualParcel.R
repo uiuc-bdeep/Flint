@@ -16,7 +16,7 @@ pkgTest <- function(x) {
 }
 
 ## These lines load the required packages
-packages <- c("readxl", "data.table", "stringr", "plyr")
+packages <- c("readxl", "data.table", "stringr", "plyr", "doBy")
 lapply(packages, pkgTest)
 
 #################################################################################
@@ -58,10 +58,20 @@ mergedData_hadID <- mergedData[which(!is.na(mergedData$ImportParcelID)),]
 
 mergedData_date <- subset(mergedData_date, select = c("TransId", "LABID", "Lead_mgl", "Lead_Viola", "Results_Se", "Notes"))
 
-allVal_Lead <- merge(x = transData, y = mergedData_date, 
-                         by.x = c("TransId"), 
-                         by.y = c("TransId"),
-                         all.x = T, all.y = F, allow.cartesian=TRUE)
+sum_lead <- summaryBy(Lead_mgl ~ TransId, data=mergedData_date, FUN=c(mean))
+
+transData$Tested_House <- NA
+
+for (i in 1:nrow(sum_lead)){
+  
+  transData$Tested_House[which(transData$TransId == sum_lead$TransId[i])] <- sum_lead$Lead_mgl.mean[i]
+  
+}
+
+#allVal_Lead <- merge(x = transData, y = mergedData_date, 
+#                         by.x = c("TransId"), 
+#                         by.y = c("TransId"),
+#                         all.x = T, all.y = F, allow.cartesian=TRUE)
 
 #tempTrans <- read.csv("~/share/projects/Flint/production/LeadTestsResult/forclosureTable.csv")
 #colnames(tempTrans)[1] <- "forclosureID"
@@ -71,7 +81,7 @@ allVal_Lead <- merge(x = transData, y = mergedData_date,
 #                         by.y = c("TransId"),
 #                         all.x = T, all.y = F)
 
-write.csv(allVal_Lead, "~/share/projects/Flint/production/outputs/Flint_Hedonics.csv")
+#write.csv(allVal_Lead, "~/share/projects/Flint/production/outputs/Flint_Hedonics.csv")
 
 # 18130 / 23751
 # 11180 / 23751 and 28336 / 40907

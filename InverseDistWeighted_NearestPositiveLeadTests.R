@@ -24,6 +24,8 @@ p <- 2
 #######################################
 ## package checking
 
+setwd("~/share/projects/Flint")
+
 ## This function will check if a package is installed, and if not, install it
 pkgTest <- function(x) {
   if (!require(x, character.only = TRUE))
@@ -54,9 +56,14 @@ dir <- "stores/DB26"                    # Change directory to where you've store
 
 #######################################
 # create file connection and read the files
-# points_data <- read.csv("stores/DB26/GeneseeZillow/geoFinalResult.csv")
+# ##path
+#points_data <- read.csv("stores/DB26/GeneseeZillow/geoFinalResult.csv")
 #pointsData <- read.csv("production/crawled.csv")
-pointsData <- read.csv("production/new_data__.csv")
+# newly crawled data
+# pointsData <- read.csv("production/new_data__.csv")
+# whole hedonics data
+pointsData <- read.csv("production/inputs/Flint_original_data.csv")
+
 
 #leadsData <- read.csv("stores/LeadTestsData/LeadTestsLatLonFixed.csv")
 leadsData <- read.csv("production/LeadTestsResult/leadData_merged.csv")  
@@ -168,7 +175,7 @@ value_3 <- vector(mode="numeric", length=nrow(points))
 value2_1 <- vector(mode="numeric", length=nrow(points))          # vector used to store the predicted lead level                                                           
 value2_2 <- vector(mode="numeric", length=nrow(points)) 
 value2_3 <- vector(mode="numeric", length=nrow(points)) 
-
+#for (i in 82600:nrow(points))
 for (i in 1 : nrow(points))
 {
   if (i %% 1000 == 0)                         # progress indicator
@@ -220,5 +227,6 @@ WRITETOFILE = TRUE     # if true, write to file
 if (WRITETOFILE)
 {
   #write.csv(points, file="/Volumes/share/projects/Flint/production/crawledWithLeadLevel.csv")
-  write.csv(points, file="production/new_data_leads.csv")
+ # write.csv(points, file="production/new_data_leads.csv") 
+  write.csv(points, file="production/intermediate_output/Flint_Analysis_1_2.csv") 
 }

@@ -71,8 +71,11 @@ points_had <- points_res[which(!is.na(points_res$ParcelswConnTypeID)),]
 
 ########################################################################
 ## field for those are not in the CONN_TYPE
+
 FIND_NEAREST_DISTANCE = FALSE
 if(FIND_NEAREST_DISTANCE == TRUE){
+  
+  setSessionTimeLimit(cpu = Inf, elapsed = Inf)
   
   points_notin <- points[which(is.na(res$OBJECTID)),]
   points_res$nearestConnID <- points_res$ParcelswConnTypeID

@@ -5,6 +5,8 @@ rm(list=ls())
 old_data <- read.csv("production/most_recent_flint_transactions.csv")
 crawled_data <- read.csv("production/new_data_leads.csv")
 
+## update the crawled code into the data chain ##
+
 for (i in 1:nrow(crawled_data))
 {
   current_transaction <- crawled_data[i,]
@@ -23,19 +25,3 @@ new_data <- rbind(old_data, crawled_data)
 write.csv(new_data, "production/most_recent_flint_transactions.csv")
 
 
-## calculating yes and no
-tests <- read.csv("production/LeadTestsResult/leadData_merged.csv")
-crawled_data$yes = 0
-crawled_data$no = 0
-for (i in 1:nrow(crawled_data))
-{
-  tests_temp <- tests[as.Date(tests$Results_Se, format="%m/%d/%Y") < crawled_data[i,]$RecordingDate,]
-  tests_temp_y <- tests_temp[tests_temp$Lead_Viola=="yes",]
-  tests_temp_n <- tests_temp[tests_temp$Lead_Viola=="no",]
-  if (nrow(tests_temp_y) != 0) {
-    crawled_data[i,]$Yes = nrow(tests_temp_y)
-  }
-  if (nrow(tests_temp_n) != 0) {
-    crawled_data[i,]$No = nrow(tests_temp_n)
-  }
-}

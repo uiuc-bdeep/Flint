@@ -37,14 +37,13 @@ transactions <- read.csv("production/intermediate_output/Flint_Analysis_1_2.csv"
 lead_tests <- read.csv("production/LeadTestsResult/leadData_merged.csv")
 
 
-##!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ## only enable these two lines when we are running on the whole hedonics file
 if (whole_set == TRUE)
 {
   transactions[,positive_var] <- 0
   transactions[,null_var] <- 0
 }
-###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 points <- transactions
 leads <- lead_tests
 
@@ -68,7 +67,7 @@ for (dist in dists)
   positive_var <- paste(positive_var, "km", sep="")
   null_var <- paste(null_var, "km", sep="")
   
-  
+  ## points == trans data, 
   for (i in 1:nrow(points))
   {
     if (i %% 1000 == 1)
@@ -77,7 +76,7 @@ for (dist in dists)
     if (length(distVec > 0))
     {
       leads_local <- leads[distVec <= dist,]
-      leads_local <- leads_local[as.Date(leads_local$Results_Se, format="%m/%d/%Y") < points[i,]$RecordingDate,]
+      leads_local <- leads_local[which(as.Date(leads_local$Results_Se, format="%m/%d/%Y") < points[i,]$RecordingDate),] ## count all leadtest before trans happening
       
       yes_temp <- nrow(leads_local[leads_local$Lead_Viola=="Yes",])
       no_temp <- nrow(leads_local[leads_local$Lead_Viola=="No",])
@@ -86,10 +85,11 @@ for (dist in dists)
     points[i, null_var] <- no_temp
   }
 }
-transactions <- transactions[,-c(1)]
-points <- points[,-c(1)]
+drop_list <- c("X.1", "X.2", "X.3")
+transactions <- transactions[,!(names(transactions) %in% drop)]
+points <- points[,!(names(points) %in% drop)]
 transactions[points$X,] = points
 
 
 
-write.csv(transactions, "production/intermediate_output/Flint_Analysis_3.csv")
+write.csv(transactions, "production/intermediate_output/Flint_Analysis_3.csv", row.names = FALSE)
