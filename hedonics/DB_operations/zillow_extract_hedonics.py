@@ -3,21 +3,24 @@ import sys
 import os
 
 ## Run in format: python3 zillow_extract_hedonics.py ST_num (delete)
+## if you would like to generate hedonics for specific city:
+## python3 zillow_extract_hedonics.py ST_num COUNTY_NAME CITY_NAME
+## example: python3 zillow_extract_hedonics.py 06 KINGS Lemoore
+
+# Check input format
+if len(sys.argv) == 1 or len(sys.argv) == 3 or len(sys.argv) > 4 :
+	print("Please enter a state number.")
+	sys.exit(-1)
 
 # Declare gloabal variables, see zillow_txt_to_database.py for details
-path = '/home/schadri/share/projects/Zillow_Housing/stores/Zillow_2017_Nov/'
-dbname = 'zillow_2017_nov'
+path = '/home/schadri/share/projects/Zillow_Housing/stores/Zillow_2019_Sep/'
+dbname = 'zillow_2019_sep'
 st_num = sys.argv[1]
-completionfilename = './store_records_new/Data_Stored_%s.txt' % st_num
+completionfilename = './store_records_2019/Data_Stored_%s.txt' % st_num
 zasmschema = 'newzasmt' + st_num
 ztransschema = 'newztrans' + st_num
 # delete option, indicating whether to delete the zasmt & ztrans schemas
 delete = False
-
-# Check input format
-if len(sys.argv) == 1 or len(sys.argv) > 3:
-	print("Please enter a state number.")
-	sys.exit(-1)
 
 # Check state number exists
 if not os.path.exists(path + st_num):
@@ -33,6 +36,39 @@ conn_string = "host='localhost' dbname='{}' user='postgres' password='bdeep'".fo
 conn = psycopg2.connect(conn_string)
 cursor = conn.cursor()
 print("Connected to database: host = localhost dbname = {} user = postgres".format(dbname))
+
+utmain = 'utmain'
+utpropertyinfo = 'utpropertyinfo'
+
+# flag for subset
+subset = False
+
+if len(sys.argv) == 4:
+	subset = True
+	county_name = sys.argv[2]
+	city_name = sys.argv[3]
+
+# subset the table
+if subset:
+	cursor.execute(""" SELECT * 
+					   INTO %s.temp_property
+					   FROM %s.utpropertyinfo
+					   WHERE propertycity = '%s' OR propertycity = '%s'
+				   """ % (ztransschema, ztransschema, city_name, city_name.upper())
+	cursor.execute(""" SELECT *
+					   INTO %s.temp_main
+					   FROM %s.utmain
+					   WHERE county = '%s'
+				   """ % (ztransschema, ztransschema, county_name))
+	cursor.execute(""" SELECT *
+					INTO %s.temp_main
+					FROM %s.utmain
+					WHERE county = '%s'
+				""" % (zasmschema, zasmschema, county_name))
+	conn.commit()
+	utmain = 'temp_main'
+	utpropertyinfo = 'temp_property'
+	
 
 # Start constructing hedonics
 print("Start Constructing hedonics...")
@@ -51,8 +87,8 @@ cursor.execute(""" SELECT RowID, ImportParcelID, LoadID,
                           NoOfBuildings,
                           LotSizeAcres, LotSizeSquareFeet,
                           TaxAmount, TaxYear
-  				  INTO %s.BASE FROM %s.utmain
-			   """ % (zasmschema, zasmschema))
+  				  INTO %s.BASE FROM %s.%s
+			   """ % (zasmschema, zasmschema, utmain))
 
 # clear duplicates, keep the only importparcelid with the largest loadid
 cursor.execute(""" WITH DATA AS (
@@ -123,11 +159,11 @@ cursor.execute(""" WITH ATTR AS (
 conn.commit()
 print("ZAsmt hedonics finished")
 
-# ZTrans hedonics
+# # ZTrans hedonics
 cursor.execute(""" SELECT *
 					INTO %s.PROPTRANS
-					FROM %s.utpropertyinfo
-			   """ % (ztransschema, ztransschema))
+					FROM %s.%s
+			   """ % (ztransschema, ztransschema, utpropertyinfo))
 # delete duplicates
 cursor.execute(""" WITH DATA AS (
 						  SELECT PropertySequenceNumber,
@@ -155,9 +191,9 @@ cursor.execute(""" SELECT TransId, LoadID,
                           TransferTaxExemptFlag, PropertyUseStndCode,
                           AssessmentLandUseStndCode, OccupancyStatusStndCode
 					INTO %s.TRANS
-					FROM %s.utmain
+					FROM %s.%s
 					WHERE DataClassStndCode IN ('D', 'H', 'F', 'M')
-		   	   """ % (ztransschema, ztransschema))
+		   	   """ % (ztransschema, ztransschema, utmain))
 # delete duplicates
 cursor.execute(""" WITH DUP AS (
 						SELECT TransId, MAX(LoadID) AS LoadID, COUNT(*)
@@ -170,6 +206,16 @@ cursor.execute(""" WITH DUP AS (
 					WHERE DUP.TransId = TR.TransId
 					AND DUP.LoadID > TR.LoadID;
 			   """ % (ztransschema, ztransschema))
+
+# change data type
+cursor.execute(""" ALTER TABLE %s.TRANS
+						ALTER COLUMN transid TYPE varchar(250);
+			   """ % (ztransschema))
+
+cursor.execute(""" ALTER TABLE %s.PROPTRANS
+						ALTER COLUMN transid TYPE varchar(250);
+			   """ % (ztransschema))
+
 # collect ztrans hedonics
 cursor.execute(""" SELECT PROP.*,
 						  TR.RecordingDate,
@@ -178,6 +224,7 @@ cursor.execute(""" SELECT PROP.*,
 						  TR.EffectiveDate,
 						  TR.SalesPriceAmount,
 					      TR.SalesPriceAmountStndCode,
+						  TR.LoanAmount,
 						  TR.LoanAmountStndCode,
 						  TR.DataClassStndCode,
 						  TR.DocumentTypeStndCode,
@@ -195,33 +242,21 @@ cursor.execute(""" SELECT PROP.*,
 conn.commit()
 print("ZTrans hedonics finished")
 # Final hedonics
-cursor.execute(""" SELECT ZASMTHED.*,
-					      ZTRANSHED.transid,
-						  ZTRANSHED.assessorparcelnumber,
-						  ZTRANSHED.unformattedassessorparcelnumber,
-						  ZTRANSHED.legallotsize,
-						  ZTRANSHED.propertysequencenumber,
-						  ZTRANSHED.propertyaddressmatchcode,
-						  ZTRANSHED.propertyaddressgeocodematchcode,
-						  ZTRANSHED.legalsectwnrngmer,
-						  ZTRANSHED.legalcity,
-						  ZTRANSHED.bkfspid,
-						  ZTRANSHED.assessmentrecordmatchflag,
-						  ZTRANSHED.recordingdate,
-						  ZTRANSHED.documentdate,
-						  ZTRANSHED.signaturedate,
-						  ZTRANSHED.salespriceamountstndcode,
-						  ZTRANSHED.loanamountstndcode,
-						  ZTRANSHED.dataclassstndcode,
-						  ZTRANSHED.partialinteresttransferstndcode,
-						  ZTRANSHED.salespriceamount,
-						  ZTRANSHED.IntraFamilyTransferFlag,
-						  ZTRANSHED.TransferTaxExemptFlag
+cursor.execute(""" SELECT ImportParcelID, TransID, PropertySequenceNumber, RecordingDate, DocumentDate, SignatureDate, EffectiveDate, 
+						  SalesPriceAmount, LoanAmount, SalesPriceAmountStndCode, LoanAmountStndCode, DataClassStndCode, DocumentTypeStndCode, 
+						  PartialInterestTransferStndCode, IntraFamilyTransferFlag, TransferTaxExemptFlag, PropertyUseStndCode, AssessmentLandUseStndCode, 
+						  OccupancyStatusStndCode, RowID, BuildingOrImprovementNumber, ZASMTHED.LoadID, ZASMTHED.FIPS, State, County, ZASMTHED.PropertyFullStreetAddress, 
+						  ZASMTHED.PropertyHouseNumber, ZASMTHED.PropertyHouseNumberExt, ZASMTHED.PropertyStreetPreDirectional, ZASMTHED.PropertyStreetName, ZASMTHED.PropertyStreetSuffix,
+						  ZASMTHED.PropertyStreetPostDirectional, ZASMTHED.PropertyCity, ZASMTHED.PropertyState, ZASMTHED.PropertyZip, ZASMTHED.PropertyBuildingNumber, ZASMTHED.PropertyAddressUnitDesignator,
+						  ZASMTHED.PropertyAddressUnitNumber, ZASMTHED.PropertyAddressLatitude, ZASMTHED.PropertyAddressLongitude, ZASMTHED.PropertyAddressCensusTractAndBlock, ZASMTHED.NoOfBuildings,
+						  ZASMTHED.LotSizeAcres, ZASMTHED.LotSizeSquareFeet, ZASMTHED.TaxAmount, ZASMTHED.TaxYear, ZASMTHED.NoOfUnits, ZASMTHED.YearBuilt, ZASMTHED.EffectiveYearBuilt, ZASMTHED.YearRemodeled, 
+						  ZASMTHED.NoOfStories, ZASMTHED.StoryTypeStndCode, ZASMTHED.TotalRooms, ZASMTHED.TotalBedrooms, ZASMTHED.FullBath, ZASMTHED.ThreeQuarterBath, ZASMTHED.HalfBath, ZASMTHED.QuarterBath, 
+						  ZASMTHED.HeatingTypeorSystemStndCode, ZASMTHED.PropertyLandUseStndCode, ZASMTHED.WaterStndCode, ZASMTHED.sqfeet
 					INTO %s
-					FROM %s.HEDONICS AS ZASMTHED
-					INNER JOIN %s.HEDONICS AS ZTRANSHED
-					ON ZASMTHED.importparcelid = ZTRANSHED.importparcelid
+					FROM %s.HEDONICS AS ZASMTHED join %s.HEDONICS
+					using(ImportParcelID)
 			   """ % ('hedonics_new.hedonics_'+st_num, zasmschema, ztransschema))
+
 # Final commit
 conn.commit()
 print("Final hedonics finished")
