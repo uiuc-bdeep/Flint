@@ -28,7 +28,8 @@ code <- c("01", "02", "04", "05", "06", "08", "09", "10", "11", "12",
 
 # need to delete the state path
 hedonics_output <- "/home/bdeep/share/projects/Zillow_Housing/stores/Hedonics/hedonics_output_2019/"
-state <- "MI"
+census_output <- "/home/bdeep/share/projects/Zillow_Housing/stores/Hedonics/State_Hedonics_Census/"
+state <- "OH"
 state_code <- code[which(abbr == state)]
 
 get_layerName <- function(shp_file_path)
@@ -96,7 +97,7 @@ get_layerName <- function(shp_file_path)
   # step 7: Appending the polygons' information to points dataframe #
   points_res <- cbind(points_res, res)
 
-  saveRDS(points_res, paste0(hedonics_output, state, "Hedonics_withTract_ANDY_2019.rds"))
+  saveRDS(points_res, paste0(census_output, state, "Hedonics_withTract_2019.rds"))
   print("file generated")
   
   ###########################################################################
